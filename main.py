@@ -84,6 +84,12 @@ def main(page: ft.Page):
         content.controls.append(
             ft.Container(
                 content=ft.Column([
+                    # Заголовок — только на этом экране
+                    ft.Text("📅 Расписание", size=28, weight=ft.FontWeight.BOLD),
+                    ft.Text("ВМедА им. С.М. Кирова", size=14, color=ft.Colors.GREY_700),
+                    ft.Container(height=30),
+                    
+                    # Выбор группы
                     ft.Text("Выберите группу", size=20, weight=ft.FontWeight.BOLD),
                     ft.Container(height=10),
                     course_dropdown,
@@ -253,17 +259,14 @@ def main(page: ft.Page):
                 "Пятница", "Суббота", "Воскресенье"]
         return days[weekday]
 
-    # --- Заголовок ---
-    header = ft.Container(
-        content=ft.Column([
-            ft.Text("📅 Расписание", size=28, weight=ft.FontWeight.BOLD),
-            ft.Text("ВМедА им. С.М. Кирова", size=14, color=ft.Colors.GREY_700),
-        ]),
-        padding=20,
-    )
+     # --- Сборка ---
+    page.add(content)
 
-    # --- Сборка ---
-    page.add(header, content)
+    if saved_group:
+        state["group"] = saved_group
+        show_schedule()
+    else:
+        show_selection()
 
     if saved_group:
         state["group"] = saved_group
