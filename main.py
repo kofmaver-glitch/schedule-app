@@ -1,16 +1,15 @@
 """
 Точка входа приложения.
-Шаг 5: сохранение выбора группы (через JSON-файл).
+Шаг 6: выбор дня — навигация по датам.
 """
 
 import flet as ft
-from datetime import date
+from datetime import date, timedelta
 
 from data.filters import get_courses, get_groups, get_schedule_for_date
 from data.user_settings import get_setting, set_setting, remove_setting
 
 
-# Ключи настроек
 KEY_COURSE = "selected_course"
 KEY_GROUP = "selected_group"
 
@@ -22,18 +21,17 @@ def main(page: ft.Page):
     page.window.height = 700
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    # --- Данные из Excel ---
+    # --- Данные ---
     courses = get_courses()
     initial_course = courses[0] if courses else None
 
-    # --- Читаем сохранённый выбор из файла ---
     saved_course = get_setting(KEY_COURSE)
     saved_group = get_setting(KEY_GROUP)
 
     if saved_course is None:
         saved_course = str(initial_course) if initial_course else None
 
-    # --- Выпадашка курса ---
+    # --- Выпадашки ---
     course_dropdown = ft.Dropdown(
         label="Курс",
         options=[ft.dropdown.Option(str(c)) for c in courses],
@@ -41,7 +39,6 @@ def main(page: ft.Page):
         width=300,
     )
 
-    # --- Выпадашка группы ---
     current_groups = get_groups(int(saved_course)) if saved_course else []
     group_dropdown = ft.Dropdown(
         label="Группа",
@@ -50,7 +47,6 @@ def main(page: ft.Page):
         width=300,
     )
 
-    # --- Обновление групп при смене курса ---
     def on_course_change(e):
         selected_course = int(course_dropdown.value)
         new_groups = get_groups(selected_course)
@@ -60,8 +56,14 @@ def main(page: ft.Page):
 
     course_dropdown.on_change = on_course_change
 
-    # --- Контейнер для содержимого ---
+    # --- Контейнер ---
     content = ft.Column()
+
+    # --- Состояние: текущая дата ---
+    state = {
+        "current_date": date.today(),
+        "group": saved_group,
+    }
 
     # --- Сохранение выбора ---
     def save_selection():
@@ -96,7 +98,9 @@ def main(page: ft.Page):
     # --- Обработка «Продолжить» ---
     def on_continue():
         save_selection()
-        show_schedule(group_dropdown.value)
+        state["group"] = group_dropdown.value
+        state["current_date"] = date.today()
+        show_schedule()
 
     # --- Смена группы ---
     def change_group():
@@ -104,23 +108,34 @@ def main(page: ft.Page):
         remove_setting(KEY_GROUP)
         show_selection()
 
+    # --- Навигация по датам ---
+    def go_prev_day():
+        state["current_date"] -= timedelta(days=1)
+        show_schedule()
+
+    def go_next_day():
+        state["current_date"] += timedelta(days=1)
+        show_schedule()
+
+    def go_today():
+        state["current_date"] = date.today()
+        show_schedule()
+
     # --- Экран расписания ---
-    def show_schedule(group: str):
+    def show_schedule():
+        group = state["group"]
         if not group:
             show_selection()
             return
 
-        today = date.today()
-        df = get_schedule_for_date(group, today)
+        target_date = state["current_date"]
+        df = get_schedule_for_date(group, target_date)
 
         content.controls.clear()
 
-        # --- Верхняя панель: назад / группа / ⚙ ---
+        # --- Верхняя панель ---
         top_bar = ft.Row([
-            ft.TextButton(
-                content="←",
-                on_click=lambda e: change_group(),
-            ),
+            ft.TextButton(content="←", on_click=lambda e: change_group()),
             ft.Text(
                 group,
                 size=18,
@@ -134,14 +149,54 @@ def main(page: ft.Page):
             ),
         ])
 
-        # --- Дата ---
-        date_str = today.strftime("%d.%m.%Y")
-        weekday = _weekday_ru(today.weekday())
+        # --- Дата и день недели ---
+        weekday = _weekday_ru(target_date.weekday())
+        date_str = target_date.strftime("%d.%m.%Y")
+        is_today = target_date == date.today()
+
+        # --- Навигация по дням ---
+        date_nav = ft.Row([
+            ft.IconButton(
+                icon=ft.Icons.CHEVRON_LEFT,
+                on_click=lambda e: go_prev_day(),
+            ),
+            ft.Column([
+                ft.Text(
+                    weekday,
+                    size=16,
+                    weight=ft.FontWeight.BOLD,
+                    text_align=ft.TextAlign.CENTER,
+                ),
+                ft.Text(
+                    date_str,
+                    size=13,
+                    color=ft.Colors.GREY_700,
+                    text_align=ft.TextAlign.CENTER,
+                ),
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True),
+            ft.IconButton(
+                icon=ft.Icons.CHEVRON_RIGHT,
+                on_click=lambda e: go_next_day(),
+            ),
+        ])
+
+        # --- Кнопка «Сегодня» — только если не сегодня ---
+        nav_controls = [date_nav]
+        if not is_today:
+            nav_controls.append(
+                ft.TextButton(
+                    content="← Сегодня",
+                    on_click=lambda e: go_today(),
+                ),
+            )
 
         # --- Список пар ---
         if df.empty:
             pairs_list = [
-                ft.Text(f"На {date_str} пар нет", color=ft.Colors.GREY_700),
+                ft.Container(
+                    content=ft.Text("Пар нет 🎉", color=ft.Colors.GREY_700),
+                    padding=20,
+                ),
             ]
         else:
             pairs_list = []
@@ -176,8 +231,9 @@ def main(page: ft.Page):
             ft.Container(
                 content=ft.Column([
                     top_bar,
-                    ft.Text(f"{weekday}, {date_str}", size=14, color=ft.Colors.GREY_700),
-                    ft.Container(height=10),
+                    ft.Container(height=5),
+                    *nav_controls,
+                    ft.Container(height=15),
                     *pairs_list,
                 ]),
                 padding=20,
@@ -185,7 +241,7 @@ def main(page: ft.Page):
         )
         page.update()
 
-    # --- День недели по-русски ---
+    # --- День недели ---
     def _weekday_ru(weekday: int) -> str:
         days = ["Понедельник", "Вторник", "Среда", "Четверг",
                 "Пятница", "Суббота", "Воскресенье"]
@@ -203,9 +259,9 @@ def main(page: ft.Page):
     # --- Сборка ---
     page.add(header, content)
 
-    # --- Что показать при запуске? ---
     if saved_group:
-        show_schedule(saved_group)
+        state["group"] = saved_group
+        show_schedule()
     else:
         show_selection()
 
