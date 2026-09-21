@@ -65,6 +65,27 @@ def main(page: ft.Page):
         "current_date": date.today(),
         "group": saved_group,
     }
+ # --- Календарь ---
+    date_picker = ft.DatePicker(
+        first_date=datetime(2026, 9, 1),
+        last_date=datetime(2027, 8, 31),
+        help_text="Выберите дату",
+    )
+
+    def on_date_picked(e):
+        if date_picker.value:
+            picked = date_picker.value
+            # Если datetime с timezone — конвертируем в локальное время
+            if picked.tzinfo is not None:
+                picked = picked.astimezone()
+            state["current_date"] = picked.date()
+            show_schedule()
+
+    date_picker.on_change = on_date_picked
+
+    def open_calendar(e):
+        date_picker.open = True
+        page.update()
 
     # --- Сохранение выбора ---
     def save_selection():
@@ -174,12 +195,19 @@ def main(page: ft.Page):
                     weight=ft.FontWeight.BOLD,
                     text_align=ft.TextAlign.CENTER,
                 ),
-                ft.Text(
-                    date_str,
-                    size=13,
-                    color=ft.Colors.GREY_700,
-                    text_align=ft.TextAlign.CENTER,
-                ),
+                ft.Row([
+                    ft.Text(
+                        date_str,
+                        size=13,
+                        color=ft.Colors.GREY_700,
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.CALENDAR_MONTH,
+                        icon_size=18,
+                        on_click=open_calendar,
+                        tooltip="Выбрать дату",
+                    ),
+                ], alignment=ft.MainAxisAlignment.CENTER, spacing=0),
             ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True),
             ft.IconButton(
                 icon=ft.Icons.CHEVRON_RIGHT,
@@ -301,7 +329,8 @@ def main(page: ft.Page):
             return False
 
         return start <= current <= end
-     # --- Сборка ---
+    # --- Сборка ---
+    page.overlay.append(date_picker)
     page.add(content)
 
     if saved_group:
