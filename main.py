@@ -1,6 +1,6 @@
 """
 Точка входа приложения.
-Шаг 6: выбор дня — навигация по датам.
+Шаг 6: выбор дня + скролл.
 """
 
 import flet as ft
@@ -31,7 +31,7 @@ def main(page: ft.Page):
     if saved_course is None:
         saved_course = str(initial_course) if initial_course else None
 
-    # --- Выпадашки ---
+    # --- Выпадашка курса ---
     course_dropdown = ft.Dropdown(
         label="Курс",
         options=[ft.dropdown.Option(str(c)) for c in courses],
@@ -39,6 +39,7 @@ def main(page: ft.Page):
         width=300,
     )
 
+    # --- Выпадашка группы ---
     current_groups = get_groups(int(saved_course)) if saved_course else []
     group_dropdown = ft.Dropdown(
         label="Группа",
@@ -57,9 +58,9 @@ def main(page: ft.Page):
     course_dropdown.on_change = on_course_change
 
     # --- Контейнер ---
-    content = ft.Column()
+    content = ft.Column(expand=True)
 
-    # --- Состояние: текущая дата ---
+    # --- Состояние ---
     state = {
         "current_date": date.today(),
         "group": saved_group,
@@ -229,14 +230,19 @@ def main(page: ft.Page):
 
         content.controls.append(
             ft.Container(
-                content=ft.Column([
-                    top_bar,
-                    ft.Container(height=5),
-                    *nav_controls,
-                    ft.Container(height=15),
-                    *pairs_list,
-                ]),
+                content=ft.Column(
+                    controls=[
+                        top_bar,
+                        ft.Container(height=5),
+                        *nav_controls,
+                        ft.Container(height=15),
+                        *pairs_list,
+                    ],
+                    scroll=ft.ScrollMode.AUTO,
+                    expand=True,
+                ),
                 padding=20,
+                expand=True,
             )
         )
         page.update()
