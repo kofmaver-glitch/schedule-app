@@ -4,7 +4,7 @@
 """
 
 import flet as ft
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from data.filters import get_courses, get_groups, get_schedule_for_date
 from data.user_settings import get_setting, set_setting, remove_setting
@@ -207,29 +207,55 @@ def main(page: ft.Page):
             ]
         else:
             pairs_list = []
+            now = datetime.now()
+            is_today = (target_date == date.today())
+
             for _, row in df.iterrows():
                 if row["Аудитория"]:
                     aud_text = f"Ауд. {row['Аудитория']}"
                 else:
                     aud_text = "—"
 
+                # Проверяем, идёт ли пара сейчас
+                is_current = False
+                if is_today:
+                    is_current = _is_time_in_range(now, row["Время"])
+
+                # Цвета для карточки
+                if is_current:
+                    bg = ft.Colors.GREEN_100
+                else:
+                    bg = ft.Colors.GREY_100
+
+                # Список строк внутри карточки
+                card_content = []
+
+                if is_current:
+                    card_content.append(
+                        ft.Text("🟢 СЕЙЧАС ИДЁТ", size=11, 
+                                color=ft.Colors.GREEN_700,
+                                weight=ft.FontWeight.BOLD)
+                    )
+
+                card_content.extend([
+                    ft.Text(
+                        f"{row['Время']}  •  {row['Тип']}",
+                        size=12,
+                        color=ft.Colors.GREY_700,
+                    ),
+                    ft.Text(
+                        row["Предмет"],
+                        size=15,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    ft.Text(aud_text, size=13),
+                ])
+
                 pairs_list.append(
                     ft.Container(
-                        content=ft.Column([
-                            ft.Text(
-                                f"{row['Время']}  •  {row['Тип']}",
-                                size=12,
-                                color=ft.Colors.GREY_700,
-                            ),
-                            ft.Text(
-                                row["Предмет"],
-                                size=15,
-                                weight=ft.FontWeight.BOLD,
-                            ),
-                            ft.Text(aud_text, size=13),
-                        ]),
+                        content=ft.Column(card_content),
                         padding=12,
-                        bgcolor=ft.Colors.GREY_100,
+                        bgcolor=bg,
                         border_radius=10,
                     )
                 )
@@ -258,7 +284,23 @@ def main(page: ft.Page):
         days = ["Понедельник", "Вторник", "Среда", "Четверг",
                 "Пятница", "Суббота", "Воскресенье"]
         return days[weekday]
+    # --- Проверка: идёт ли пара сейчас ---
+    def _is_time_in_range(now, time_range: str) -> bool:
+        """
+        Проверяет, находится ли текущее время внутри интервала.
+        time_range — строка вида '13:50 – 15:30'.
+        """
+        current = now.strftime("%H:%M")
+        cleaned = time_range.replace(" ", "")
 
+        if "–" in cleaned:
+            start, end = cleaned.split("–")
+        elif "-" in cleaned:
+            start, end = cleaned.split("-")
+        else:
+            return False
+
+        return start <= current <= end
      # --- Сборка ---
     page.add(content)
 
