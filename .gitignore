@@ -47,4 +47,6 @@ desktop.ini
 # Временные
 *.tmp
 *.bak
+# Настройки пользователя
+user_settings.json
 ~*
