@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Виртуальные окружения
+venv/
+ENV/
+env/
+.venv/
+
+# Flet
+build/
+*.apk
+*.aab
+*.ipa
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Системные
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Логи
+*.log
+
+# Временные
+*.tmp
+*.bak
+~*
