@@ -8,18 +8,24 @@ from datetime import date, datetime, timedelta
 
 from data.filters import get_courses, get_groups, get_schedule_for_date
 from data.user_settings import get_setting, set_setting, remove_setting
+from ui.themes import apply_theme, THEMES, DEFAULT_THEME
+from ui.settings_screen import create_settings_screen
 
 
 KEY_COURSE = "selected_course"
 KEY_GROUP = "selected_group"
+KEY_THEME = "selected_theme" 
 
 
 def main(page: ft.Page):
     """Главная функция приложения."""
-    page.title = "Расписание"
+    page.title = "VMedA.day"
     page.window.width = 400
     page.window.height = 700
-    page.theme_mode = ft.ThemeMode.LIGHT
+    
+    # Загружаем сохранённую тему или используем тёмную по умолчанию
+    saved_theme = get_setting(KEY_THEME) or DEFAULT_THEME
+    apply_theme(page, saved_theme)
 
     # --- Данные ---
     courses = get_courses()
@@ -107,7 +113,7 @@ def main(page: ft.Page):
                 content=ft.Column([
                     # Заголовок — только на этом экране
                     ft.Text("📅 Расписание", size=28, weight=ft.FontWeight.BOLD),
-                    ft.Text("ВМедА им. С.М. Кирова", size=14, color=ft.Colors.GREY_700),
+                    ft.Text("ВМедА им. С.М. Кирова", size=14, color=ft.Colors.ON_SURFACE_VARIANT),
                     ft.Container(height=30),
                     
                     # Выбор группы
@@ -135,6 +141,22 @@ def main(page: ft.Page):
         remove_setting(KEY_COURSE)
         remove_setting(KEY_GROUP)
         show_selection()
+    # --- Экран настроек ---
+    def show_settings():
+        """Открывает экран настроек."""
+        content.controls.clear()
+        content.controls.append(
+            create_settings_screen(
+                page=page,
+                current_group=state["group"],
+                on_change_group=change_group,
+                on_back=show_schedule,
+                get_setting=get_setting,
+                set_setting=set_setting,
+                KEY_THEME=KEY_THEME,
+            )
+        )
+        page.update()
 
     # --- Навигация по датам ---
     def go_prev_day():
@@ -173,7 +195,7 @@ def main(page: ft.Page):
             ),
             ft.IconButton(
                 icon=ft.Icons.SETTINGS,
-                on_click=lambda e: change_group(),
+                on_click=lambda e: show_settings(),
             ),
         ])
 
@@ -199,7 +221,7 @@ def main(page: ft.Page):
                     ft.Text(
                         date_str,
                         size=13,
-                        color=ft.Colors.GREY_700,
+                        color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     ft.IconButton(
                         icon=ft.Icons.CALENDAR_MONTH,
@@ -229,7 +251,7 @@ def main(page: ft.Page):
         if df.empty:
             pairs_list = [
                 ft.Container(
-                    content=ft.Text("Пар нет 🎉", color=ft.Colors.GREY_700),
+                    content=ft.Text("Пар нет 🎉", color=ft.Colors.ON_SURFACE_VARIANT),
                     padding=20,
                 ),
             ]
@@ -249,11 +271,22 @@ def main(page: ft.Page):
                 if is_today:
                     is_current = _is_time_in_range(now, row["Время"])
 
+                # Берём тему пользователя
+                theme_key = get_setting(KEY_THEME) or DEFAULT_THEME
+                theme_data = THEMES.get(theme_key, {})
+                theme_card_color = theme_data.get("card_color")
+                theme_card_text = theme_data.get("card_text_color")
+
                 # Цвета для карточки
                 if is_current:
-                    bg = ft.Colors.GREEN_100
+                    bg = ft.Colors.with_opacity(0.3, ft.Colors.GREEN)
+                    card_text = None
+                elif theme_card_color:
+                    bg = theme_card_color
+                    card_text = theme_card_text
                 else:
-                    bg = ft.Colors.GREY_100
+                    bg = ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE)
+                    card_text = None
 
                 # Список строк внутри карточки
                 card_content = []
@@ -261,22 +294,30 @@ def main(page: ft.Page):
                 if is_current:
                     card_content.append(
                         ft.Text("🟢 СЕЙЧАС ИДЁТ", size=11, 
-                                color=ft.Colors.GREEN_700,
+                                color=ft.Colors.GREEN,
                                 weight=ft.FontWeight.BOLD)
                     )
+
+                # Цвет для вторичного текста (время, тип, аудитория)
+                secondary_color = card_text if card_text else ft.Colors.ON_SURFACE_VARIANT
 
                 card_content.extend([
                     ft.Text(
                         f"{row['Время']}  •  {row['Тип']}",
                         size=12,
-                        color=ft.Colors.GREY_700,
+                        color=secondary_color,
                     ),
                     ft.Text(
                         row["Предмет"],
                         size=15,
                         weight=ft.FontWeight.BOLD,
+                        color=card_text if card_text else None,
                     ),
-                    ft.Text(aud_text, size=13),
+                    ft.Text(
+                        aud_text,
+                        size=13,
+                        color=secondary_color,
+                    ),
                 ])
 
                 pairs_list.append(
@@ -339,12 +380,5 @@ def main(page: ft.Page):
     else:
         show_selection()
 
-    if saved_group:
-        state["group"] = saved_group
-        show_schedule()
-    else:
-        show_selection()
-
-
 if __name__ == "__main__":
-    ft.run(main)
+    ft.run(main, view=ft.AppView.WEB_BROWSER)
