@@ -1,5 +1,6 @@
 """
 Главный парсер: собирает всё расписание из Word в Excel.
+Работает для любого курса — принимает параметры.
 """
 
 from docx import Document
@@ -8,7 +9,7 @@ from pathlib import Path
 
 from parser.cell_parser import parse_cell
 from parser.date_builder import build_date, format_date
-from parser.constants import TIME_SLOTS, SUBJECTS
+from parser.constants import get_time, SUBJECTS
 
 
 # Индексы столбцов в исходной таблице
@@ -17,47 +18,54 @@ COL_HOURS = 1
 COL_DAY_START = 2  # дальше идут дни месяца
 
 
-def build_schedule(docx_path: str = "schedule.docx", 
-                   output_path: str = "assets/schedule.xlsx") -> pd.DataFrame:
-    """Главная функция: читает docx, возвращает DataFrame."""
+def build_schedule(
+    docx_path: str,
+    output_path: str,
+    course: int,
+    specialty: str = "ЛД",
+) -> pd.DataFrame:
+    """
+    Главная функция: читает docx, возвращает DataFrame.
+    
+    docx_path — путь к .docx файлу
+    output_path — путь для сохранения .xlsx
+    course — номер курса (3, 4, ...)
+    specialty — специальность (ЛД, Ст, ...)
+    """
     
     doc = Document(docx_path)
     
-    # Обрабатываем только таблицы основного расписания (№0-№8)
-    # №9 — зачёты/экзамены, №10 — расшифровка. Пока пропускаем.
+    # Основное расписание — таблицы 0-8 (для 3 курса)
+    # Для 4 курса структура похожа — берём первые 9 таблиц
     main_tables = doc.tables[0:9]
     
     rows = []
     
     for table_idx, table in enumerate(main_tables):
-        print(f"Обрабатываю таблицу №{table_idx}...")
-        table_rows = _parse_table(table)
+        print(f"  Обрабатываю таблицу №{table_idx}...")
+        table_rows = _parse_table(table, course, specialty)
         rows.extend(table_rows)
     
     df = pd.DataFrame(rows)
     
-    # Заменяем NaN на пустые строки (для чистого Excel)
+    # Заменяем NaN на пустые строки
     df = df.fillna("")
     
     # Сохраняем в Excel
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     df.to_excel(output_path, index=False)
-    print(f"\n✅ Сохранено: {output_path}")
-    print(f"Всего записей: {len(df)}")
+    print(f"  ✅ Сохранено: {output_path}")
+    print(f"  Всего записей: {len(df)}")
     
     return df
 
 
-def _parse_table(table) -> list:
+def _parse_table(table, course: int, specialty: str) -> list:
     """
     Обрабатывает одну таблицу.
     Возвращает список словарей (по одному на каждую пару).
     """
     result = []
-    
-    # Строка 0 — шапка с месяцами
-    # Строка 1 — числа месяца
-    # Строки 2+ — данные
     
     # Определяем, какие месяцы в каких столбцах
     month_by_col = _map_months_to_columns(table)
@@ -82,7 +90,7 @@ def _parse_table(table) -> list:
         
         # Часы занятий (1-2, 3-4 и т.д.)
         hours = row.cells[COL_HOURS].text.strip()
-        if not hours or hours not in TIME_SLOTS:
+        if not hours:
             continue
         
         # Проходим по всем дням месяца (столбцы с 2-го и далее)
@@ -117,13 +125,17 @@ def _parse_table(table) -> list:
             # Название предмета из расшифровки
             subject_name = SUBJECTS.get(parsed["код"], parsed["код"])
             
+            # Время пары — в зависимости от курса
+            time_str = get_time(course, hours)
+            
             result.append({
-                "Курс": 3,
+                "Курс": course,
+                "Специальность": specialty,
                 "Группа": current_group,
                 "Дата": format_date(date_obj),
                 "День_недели": _weekday_ru(date_obj),
                 "Часы": hours,
-                "Время": TIME_SLOTS[hours],
+                "Время": time_str,
                 "Тип": parsed["тип"],
                 "Код": parsed["код"],
                 "Предмет": subject_name,
@@ -162,6 +174,14 @@ def _weekday_ru(d) -> str:
 
 
 if __name__ == "__main__":
-    df = build_schedule()
+    # Тестовый запуск — 3 курс
+    print("Парсинг 3 курса:")
+    df3 = build_schedule(
+        docx_path="schedule.docx",
+        output_path="assets/schedule_3.xlsx",
+        course=3,
+        specialty="ЛД",
+    )
+    
     print("\nПервые 10 строк:")
-    print(df.head(10))
+    print(df3.head(10).to_string())

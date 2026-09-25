@@ -61,7 +61,7 @@ def main(page: ft.Page):
         group_dropdown.value = new_groups[0] if new_groups else None
         page.update()
 
-    course_dropdown.on_change = on_course_change
+    course_dropdown.on_select = on_course_change
 
     # --- Контейнер ---
     content = ft.Column(expand=True)
@@ -381,4 +381,9 @@ def main(page: ft.Page):
         show_selection()
 
 if __name__ == "__main__":
-    ft.run(main, view=ft.AppView.WEB_BROWSER)
+    ft.run(
+    main,
+    view=ft.AppView.WEB_BROWSER,
+    port=8000,
+    host="0.0.0.0",
+)

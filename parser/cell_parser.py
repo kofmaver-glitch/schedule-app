@@ -13,35 +13,39 @@ def parse_cell(text: str) -> dict | None:
     """
     text = text.strip()
     
-    # Пустая ячейка — пропускаем
-    if not text or text in ("", " ", "\xa0"):
+    # Пустая ячейка или прочерк — пропускаем
+    if not text or text in ("", " ", "\xa0", "\\-", "-", "–"):
         return None
     
-    # Проверка на жирный шрифт (зачёт/экзамен) — передаётся снаружи, 
-    # здесь не можем определить (нужно смотреть на run.bold)
-    
-    # Определяем тип занятия
-    # 1. пр(сп) — особая практика
-    if text.lower() == "пр(сп)":
+    # --- Дистанционные лекции и практики: "БЖ-д", "ТФ-д", "ЛП-д" ---
+    if text.endswith("-д"):
+        base = text[:-2].strip()
+        # Определяем тип: заглавные = лекция, строчные = практика
+        is_lecture = base.isupper()
         return {
-            "код": "пр(сп)",
+            "код": base.lower(),
+            "аудитория": "",
+            "тип": "лекция" if is_lecture else "практика",
+            "дистант": True,
+            "сырой_текст": text,
+        }
+    
+    # --- Лекция в классе кафедры: "ПА к" ---
+    if text.endswith(" к"):
+        base = text[:-2].strip()
+        return _parse_basic(base, аудитория="класс кафедры", сырой_текст=text)
+    
+    # --- Особая практика: "пр(сп)", "пр(тп)", "пр(хп)" ---
+    if text.lower().startswith("пр(") and text.endswith(")"):
+        return {
+            "код": text.lower(),
             "аудитория": "",
             "тип": "практика",
             "дистант": False,
             "сырой_текст": text,
         }
     
-    # 2. Дистант: ПА-д
-    if text.endswith("-д"):
-        base = text[:-2].strip()
-        return _parse_basic(base, дистант=True, сырой_текст=text)
-    
-    # 3. Лекция в классе кафедры: ПА к
-    if text.endswith(" к"):
-        base = text[:-2].strip()
-        return _parse_basic(base, аудитория="класс кафедры", сырой_текст=text)
-    
-    # 4. Обычная ячейка
+    # --- Обычная ячейка ---
     return _parse_basic(text, сырой_текст=text)
 
 
@@ -64,7 +68,7 @@ def _parse_basic(text: str, дистант: bool = False,
         }
     
     # Просто код строчными (практика): "вб"
-    if re.match(r"^[а-яё\-]+$", text):
+    if re.match(r"^[а-яё\-()]+$", text):
         return {
             "код": text.lower(),
             "аудитория": аудитория,
